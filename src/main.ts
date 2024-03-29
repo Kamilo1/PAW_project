@@ -304,50 +304,62 @@ function handleAddSubmit(event: Event) {
 function showProjectStories(projectId: number) {
   const storyApi = new StoryApi();
   const stories = storyApi.getAllStories().filter(story => story.projectid === projectId);
-  
+
   const app = document.getElementById('app');
   if (!app) return;
 
+  // Czyści poprzednią zawartość
   app.innerHTML = `<h2>Historie dla projektu ID: ${projectId}</h2>
   <button class="add-story-btn">Dodaj nowy</button>`;
 
-  const table = document.createElement('table');
-  table.innerHTML = `
-  
-    <tr>
-      <th>ID</th>
-      <th>Nazwa</th>
-      <th>Opis</th>
-      <th>Priorytet</th>
-      <th>Data stworzenia</th>
-      <th class="filter-header" id="stateHeader">Stan &#9660;<div id="stateFilterOptions" class="state-filter-options"></div></th>
-      <th>Id użytkownika</th>
-      <th>Akcje</th>
-    </tr>
-  `;
-
-  stories.forEach(story => {
-    const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td>${story.id}</td>
-      <td>${story.name}</td>
-      <td>${story.description}</td>
-      <td>${story.prority}</td>
-      <td>${story.creationDate}</td>
-      <td>${story.state}</td>
-      <td>${story.OwnerId}</td>
-      <td>
-        <button class="edit-story-btn" data-id="${story.id}">Edytuj</button>
-        <button class="delete-story-btn" data-id="${story.id}">Usuń</button>
-      </td>
+  // Funkcja pomocnicza do tworzenia i dodawania sekcji dla historii
+  const addStoriesSection = (stories: Story[], title: string) => {
+    const section = document.createElement('section');
+    section.innerHTML = `<h3>${title}</h3>`;
+    const table = document.createElement('table');
+    table.innerHTML = `
+      <tr>
+        <th>Lp.</th> <!-- Dodajemy kolumnę Lp. dla lokalnego numerowania -->
+        <th>ID</th>
+        <th>Nazwa</th>
+        <th>Opis</th>
+        <th>Priorytet</th>
+        <th>Data stworzenia</th>
+        <th>Stan</th>
+        <th>Id użytkownika</th>
+        <th>Akcje</th>
+      </tr>
     `;
-   
-    table.appendChild(tr);
-    
-  });
-
-  app.appendChild(table);
   
+    let localId = 1; // Zaczynamy numerację od 1 dla każdej sekcji
+    stories.forEach(story => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${localId++}</td> <!-- Inkrementujemy lokalne ID -->
+        <td>${story.id}</td>
+        <td>${story.name}</td>
+        <td>${story.description}</td>
+        <td>${story.prority}</td>
+        <td>${new Date(story.creationDate).toLocaleDateString()}</td>
+        <td>${story.state}</td>
+        <td>${story.OwnerId}</td>
+        <td>
+          <button class="edit-story-btn" data-id="${story.id}">Edytuj</button>
+          <button class="delete-story-btn" data-id="${story.id}">Usuń</button>
+        </td>
+      `;
+      table.appendChild(tr);
+    });
+  
+    section.appendChild(table);
+    app.appendChild(section);
+  };
+
+  // Tworzy sekcje dla różnych stanów historii
+  addStoriesSection(stories.filter(story => story.state === StoryState.ToDo), "Do zrobienia");
+  addStoriesSection(stories.filter(story => story.state === StoryState.Doing), "W trakcie");
+  addStoriesSection(stories.filter(story => story.state === StoryState.Done), "Zakończone");
+
   
   document.querySelectorAll('.edit-story-btn').forEach(button => {
     button.addEventListener('click', function(event) {
@@ -405,9 +417,9 @@ function showStoriesEditForm(story: Story){
       <div>
         <label for="editStoryState">Stan:</label>
         <select id="editStoryState">
-          <option value="ToDo"}>Do zrobienia</option>
-          <option value="Doing"}>W trakcie</option>
-          <option value="Done"}>Zakończony</option>
+          <option value="todo"}>Do zrobienia</option>
+          <option value="doing"}>W trakcie</option>
+          <option value="done"}>Zakończony</option>
         </select>
       </div>
       <div>
@@ -512,3 +524,5 @@ function handleStoryAddSubmit(event: Event){
   storyApi.addStory(newStory);
   showProjectStories(storyProjectId);
 }
+
+
