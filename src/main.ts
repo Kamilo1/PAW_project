@@ -102,41 +102,17 @@ class StoryApi{
 }
 const projectAPI = new ProjectApi();
 
-
 const project1 = new Project(1, 'Projekt A', 'Opis projektu A');
 const project2 = new Project(2, 'Projekt B', 'Opis projektu B');
-
 
 projectAPI.addProject(project1);
 projectAPI.addProject(project2);
 
-
-const allProjects = projectAPI.getAllProjects();
-console.log('Wszystkie projekty:', allProjects);
-
-
-const projectById = projectAPI.getProjectByID(1);
-console.log('Projekt o ID 1:', projectById);
-
-
-project1.description = 'Nowy opis projektu A';
-projectAPI.updateProject(project1);
-
-
-
-const updatedProjects = projectAPI.getAllProjects();
-console.log('Aktualizowane projekty:', updatedProjects);
-
-ActiveProject.setActiveProject(1);
-console.log('Aktywny projekt: ', ActiveProject.getActiveProjectId());
-
 const user = new User(1, 'Krzysztof', 'Kowalski');
 
 const storyApi = new StoryApi();
-const newStory = new Story(1,'Story','Ciekawa historia',Prority.low,ActiveProject.getActiveProjectId()!,new Date(), StoryState.ToDo,user.id);
+const newStory = new Story(1,'Story','Ciekawa historia',Prority.low,1,new Date(), StoryState.ToDo,user.id);
 storyApi.addStory(newStory);
-const allStories = storyApi.getAllStories();
-console.log(allStories);
 
 function renderProjectsTable() {
   const projectAPI = new ProjectApi();
@@ -308,11 +284,11 @@ function showProjectStories(projectId: number) {
   const app = document.getElementById('app');
   if (!app) return;
 
-  // Czyści poprzednią zawartość
+
   app.innerHTML = `<h2>Historie dla projektu ID: ${projectId}</h2>
   <button class="add-story-btn">Dodaj nowy</button>`;
 
-  // Funkcja pomocnicza do tworzenia i dodawania sekcji dla historii
+
   const addStoriesSection = (stories: Story[], title: string) => {
     const section = document.createElement('section');
     section.innerHTML = `<h3>${title}</h3>`;
@@ -331,7 +307,7 @@ function showProjectStories(projectId: number) {
       </tr>
     `;
   
-    let localId = 1; // Zaczynamy numerację od 1 dla każdej sekcji
+    let localId = 1;
     stories.forEach(story => {
       const tr = document.createElement('tr');
       tr.innerHTML = `
@@ -354,8 +330,6 @@ function showProjectStories(projectId: number) {
     section.appendChild(table);
     app.appendChild(section);
   };
-
-  // Tworzy sekcje dla różnych stanów historii
   addStoriesSection(stories.filter(story => story.state === StoryState.ToDo), "Do zrobienia");
   addStoriesSection(stories.filter(story => story.state === StoryState.Doing), "W trakcie");
   addStoriesSection(stories.filter(story => story.state === StoryState.Done), "Zakończone");
