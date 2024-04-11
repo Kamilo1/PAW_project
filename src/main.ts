@@ -42,9 +42,20 @@ class ProjectApi {
   }
 }
 
-class User {
-  constructor(public id: number, public name: string, public surname: string) {}
+enum UserRole {
+  Admin = 'admin',
+  DevOps = 'devops',
+  Developer = 'developer',
 }
+
+class User {
+  constructor(public id: number, public name: string, public surname: string, public role: UserRole) {}
+}
+const mockUsers: User[] = [
+  new User(1, 'Krzysztof', 'Kowalski', UserRole.Admin),
+  new User(2, 'Anna', 'Nowak', UserRole.Developer),
+  new User(3, 'Jan', 'Zieliński', UserRole.DevOps),
+];
 class ActiveProject {
   private static storageKey = 'activeProjectId';
   static setActiveProject(projectId: number): void {
@@ -100,6 +111,57 @@ class StoryApi{
     localStorage.setItem(this.storageKey, JSON.stringify(filteredStories));
   }
 }
+enum TaskPriority {
+  Low = 'low',
+  Medium = 'medium',
+  High = 'high',
+}
+
+enum TaskState {
+  ToDo = 'todo',
+  Doing = 'doing',
+  Done = 'done',
+}
+
+class Task {
+  constructor(public id: number,public name: string,public description: string,public priority: TaskPriority,public storyId: number,public estimatedTime: number,public state: TaskState,
+    public creationDate: Date,public startDate: Date | null = null,public endDate: Date | null = null,public assignedUserId: number | null = null) {}
+}
+class TaskApi {
+  private storageKey: string = 'tasks';
+
+  getAllTasks(): Task[] {
+    const tasksString = localStorage.getItem(this.storageKey);
+    return tasksString ? JSON.parse(tasksString) : [];
+  }
+
+  getTaskById(id: number): Task | undefined {
+    const tasks = this.getAllTasks();
+    return tasks.find(task => task.id === id);
+  }
+
+  addTask(task: Task): void {
+    const tasks = this.getAllTasks();
+    tasks.push(task);
+    localStorage.setItem(this.storageKey, JSON.stringify(tasks));
+  }
+
+  updateTask(updatedTask: Task): void {
+    let tasks = this.getAllTasks();
+    const index = tasks.findIndex(task => task.id === updatedTask.id);
+    if (index !== -1) {
+      tasks[index] = updatedTask;
+      localStorage.setItem(this.storageKey, JSON.stringify(tasks));
+    }
+  }
+
+  deleteTask(id: number): void {
+    let tasks = this.getAllTasks();
+    tasks = tasks.filter(task => task.id !== id);
+    localStorage.setItem(this.storageKey, JSON.stringify(tasks));
+  }
+
+}
 const projectAPI = new ProjectApi();
 
 const project1 = new Project(1, 'Projekt A', 'Opis projektu A');
@@ -108,12 +170,49 @@ const project2 = new Project(2, 'Projekt B', 'Opis projektu B');
 projectAPI.addProject(project1);
 projectAPI.addProject(project2);
 
-const user = new User(1, 'Krzysztof', 'Kowalski');
-
 const storyApi = new StoryApi();
-const newStory = new Story(1,'Story','Ciekawa historia',Prority.low,1,new Date(), StoryState.ToDo,user.id);
+const newStory = new Story(1,'Story','Ciekawa historia',Prority.low,1,new Date(), StoryState.ToDo,2);
+const newStory2 = new Story(2,'Story2','Lepsza historia',Prority.medium,1,new Date(),StoryState.Doing,3);
 storyApi.addStory(newStory);
+storyApi.addStory(newStory2);
 
+
+const taskApi = new TaskApi();
+
+
+const task1 = new Task(
+  1, 
+  'Przygotowanie dokumentacji projektowej', 
+  'Opracowanie szczegółowej dokumentacji wymagań funkcjonalnych i niefunkcjonalnych.', 
+  TaskPriority.High, 
+  1, 
+  8, 
+  TaskState.ToDo, 
+  new Date(), 
+  undefined, 
+  undefined, 
+  undefined 
+);
+
+const task2 = new Task(
+  2, 
+  'Implementacja modułu użytkownika', 
+  'Stworzenie backendu i frontendu dla modułu zarządzania użytkownikami.', 
+  TaskPriority.Medium, 
+  1, 
+  16, 
+  TaskState.Doing, 
+  new Date(), 
+  new Date, 
+  undefined, 
+  2 
+);
+
+
+taskApi.addTask(task1);
+taskApi.addTask(task2);
+
+console.log(taskApi.getAllTasks())
 function renderProjectsTable() {
   const projectAPI = new ProjectApi();
   const projects = projectAPI.getAllProjects();
@@ -177,6 +276,7 @@ function renderProjectsTable() {
   document.querySelectorAll('.show-stories-btn').forEach(button => {
     button.addEventListener('click', (event) => {
       const projectId = parseInt((event.target as HTMLElement).getAttribute('data-id')!);
+      localStorage.setItem('currentProjectId', projectId.toString());
       showProjectStories(projectId);
     });
   });
@@ -322,6 +422,7 @@ function showProjectStories(projectId: number) {
         <td>
           <button class="edit-story-btn" data-id="${story.id}">Edytuj</button>
           <button class="delete-story-btn" data-id="${story.id}">Usuń</button>
+          <button class="show-tasks-btn" data-story-id="${story.id}">Pokaż zadania</button>
         </td>
       `;
       table.appendChild(tr);
@@ -334,7 +435,12 @@ function showProjectStories(projectId: number) {
   addStoriesSection(stories.filter(story => story.state === StoryState.Doing), "W trakcie");
   addStoriesSection(stories.filter(story => story.state === StoryState.Done), "Zakończone");
 
-  
+  document.querySelectorAll('.show-tasks-btn').forEach(button => {
+    button.addEventListener('click', function(event) {
+      const storyId = parseInt((event.currentTarget as HTMLElement).getAttribute('data-story-id')!);
+      showTasksForStory(storyId);
+    });
+  });
   document.querySelectorAll('.edit-story-btn').forEach(button => {
     button.addEventListener('click', function(event) {
         const target = event.currentTarget as HTMLButtonElement;
@@ -498,5 +604,282 @@ function handleStoryAddSubmit(event: Event){
   storyApi.addStory(newStory);
   showProjectStories(storyProjectId);
 }
+function showTasksForStory(storyId: number) {
+  const tasks = taskApi.getAllTasks().filter(task => task.storyId === storyId);
+  const app = document.getElementById('app');
+  const projectId = localStorage.getItem('currentProjectId');
+  console.log(projectId)
+  if (!app) return;
 
+  let html = `<h2>Zadania dla historii ID: ${storyId}</h2>`;
+  html += '<button class="addTaskBtn">Dodaj Nowe Zadanie</button>';
+  html += '<table><tr><th>ID</th><th>Nazwa</th><th>Opis</th><th>Priorytet</th><th>Stan</th><th>Data startu</th><th>Data zakończenia</th><th>Akcje</th></tr>';
 
+  tasks.forEach(task => {
+    html += `
+      <tr>
+        <td>${task.id}</td>
+        <td>${task.name}</td>
+        <td>${task.description}</td>
+        <td>${task.priority}</td>
+        <td>${task.state}</td>
+        <td>${task.startDate}</td>
+        <td>${task.endDate}</td>
+        <td>
+        <button class="details-task-btn" data-id="${task.id}">Szczegóły</button>
+          <button class="edit-task-btn" data-id="${task.id}">Edytuj</button>
+          <button class="delete-task-btn" data-id="${task.id}">Usuń</button>
+        </td>
+      </tr>
+    `;
+  });
+  
+  html += '</table>';
+  html += '<button class="back-to-stories">Wróć do historii</button>'
+  app.innerHTML = html;
+  document.querySelector('.back-to-stories')?.addEventListener('click', () => {
+    if (projectId) {
+      showProjectStories(parseInt(projectId));
+    } 
+  });
+  document.querySelectorAll('.details-task-btn').forEach(button => {
+    button.addEventListener('click', (event) => {
+      const taskId = parseInt((event.currentTarget as HTMLElement).getAttribute('data-id')!);
+      showTaskDetails(taskId);
+    });
+  });
+  document.querySelector('.addTaskBtn')?.addEventListener('click', () => {
+    showAddTaskForm(storyId);
+});
+  document.querySelectorAll('.edit-task-btn').forEach(button => {
+    button.addEventListener('click', (event) => {
+      const taskId = parseInt((event.target as HTMLElement).getAttribute('data-id')!);
+      const taskToEdit = taskApi.getTaskById(taskId);
+      if (taskToEdit) {
+        showEditTaskForm(taskToEdit);
+      }
+    });
+  });
+  document.querySelectorAll('.delete-task-btn').forEach(button => {
+    button.addEventListener('click', (event) => {
+        const taskId = parseInt((event.target as HTMLElement).getAttribute('data-id')!);
+        deleteTask(taskId);
+    });
+});  
+}
+
+function showEditTaskForm(task: Task) {
+  const app = document.getElementById('app');
+  if (!app) return;
+
+  app.innerHTML = `
+    <h2>Edytuj Zadanie</h2>
+    <form id="editTaskForm">
+      <input type="hidden" id="editTaskId" value="${task.id}">
+      <div><label>Nazwa:</label><input type="text" id="editTaskName" value="${task.name}"></div>
+      <div><label>Opis:</label><textarea id="editTaskDescription">${task.description}</textarea></div>
+      <div>
+        <label>Priorytet:</label>
+        <select id="editTaskPriority">
+          <option value="low" }>Niski</option>
+          <option value="medium" }>Średni</option>
+          <option value="high" }>Wysoki</option>
+        </select>
+      </div>
+      <div>
+      <label>Przewidywany czas wykonania w [h]:</label>
+      <input type="number" id="editTaskEstimatedTime" value="${task.estimatedTime}">
+      </div>
+      <div>
+        <label>Stan:</label>
+        <select id="editTaskState">
+          <option value="todo" }>Do zrobienia</option>
+          <option value="doing" }>W trakcie</option>
+          <option value="done" }>Zakończone</option>
+        </select>
+      </div>
+      <button type="submit" id="editTaskForm">Zapisz zmiany</button>
+      <button type="button" id="cancelEditTask">Anuluj</button>
+    </form>
+  `;
+  document.getElementById('cancelEditTask')?.addEventListener('click', () => {
+    const storyId = task.storyId 
+    showTasksForStory(storyId);
+});
+  document.getElementById('editTaskForm')?.addEventListener('submit', handleEditTaskSubmit);
+}
+function handleEditTaskSubmit(event: Event) {
+  event.preventDefault();
+  
+  const taskId = parseInt((document.getElementById('editTaskId') as HTMLInputElement).value);
+  const task = taskApi.getTaskById(taskId);
+  if (task) {
+    task.name = (document.getElementById('editTaskName') as HTMLInputElement).value;
+    task.description = (document.getElementById('editTaskDescription') as HTMLInputElement).value;
+    task.estimatedTime = parseInt((document.getElementById('editTaskEstimatedTime') as HTMLInputElement).value);
+    task.priority = (document.getElementById('editTaskPriority') as HTMLSelectElement).value as TaskPriority;
+    task.state = (document.getElementById('editTaskState') as HTMLSelectElement).value as TaskState;
+    taskApi.updateTask(task);
+    const currentProjectId = localStorage.getItem('currentProjectId');
+    console.log(currentProjectId)
+    if (currentProjectId) {
+      showTasksForStory(parseInt(currentProjectId));
+    }
+  }
+}
+function deleteTask(taskId: number) {
+  taskApi.deleteTask(taskId);
+  const currentProjectId = localStorage.getItem('currentProjectId');
+  if (currentProjectId) {
+      showTasksForStory(parseInt(currentProjectId));
+  } 
+}
+
+function showAddTaskForm(storyId: number) {
+  const app = document.getElementById('app');
+  if (!app) return;
+
+  app.innerHTML = `
+      <h2>Dodaj Nowe Zadanie</h2>
+      <form id="addTaskForm">
+      <div>
+          <input type="text" id="taskName" placeholder="Nazwa zadania" required>
+          </div>
+          <div>
+          <textarea id="taskDescription" placeholder="Opis zadania"></textarea>
+          </div>
+          <div>
+          <select id="taskPriority">
+              <option value="Low">Niski</option>
+              <option value="Medium">Średni</option>
+              <option value="High">Wysoki</option>
+          </select>
+          </div>
+          <div>
+          <input type="number" id="taskEstimatedTime" placeholder="Przewidywany czas w godzinach" required>
+          </div>
+          <div>
+          <select id="taskState">
+              <option value="ToDo">Do zrobienia</option>
+              <option value="Doing">W trakcie</option>
+              <option value="Done">Zakończone</option>
+          </select>
+          </div>
+          <div>
+          <input type="number" id="addTaskStoryId" value="${storyId}" readonly>
+          </div>
+          <button type="submit" id="submitTaskBtn">Dodaj</button>
+          <button type="button" id="cancelAddTask">Anuluj</button>
+      </form>
+  `;
+
+  document.getElementById('cancelAddTask')?.addEventListener('click', () => {
+      const currentProjectId = localStorage.getItem('currentProjectId');
+      if (currentProjectId) {
+          showTasksForStory(parseInt(currentProjectId));
+      }
+  });
+
+  document.getElementById('submitTaskBtn')?.addEventListener('click', handleAddTaskSubmit);
+
+}
+
+function handleAddTaskSubmit(event: Event) {
+  event.preventDefault()
+  const tasks = taskApi.getAllTasks()
+  const highestId = tasks.reduce((max, task) => task.id > max ? task.id : max, 0); 
+  const newTaskId = highestId + 1;
+  const name = (document.getElementById('taskName') as HTMLInputElement).value;
+  const description = (document.getElementById('taskDescription') as HTMLInputElement).value;
+  const priority = (document.getElementById('taskPriority') as HTMLSelectElement).value as TaskPriority;
+  const estimatedTime = parseInt((document.getElementById('taskEstimatedTime') as HTMLInputElement).value);
+  const state = (document.getElementById('taskState') as HTMLSelectElement).value as TaskState;
+  const storyId = parseInt((document.getElementById('addTaskStoryId') as HTMLInputElement).value);
+  const newTask = new Task(newTaskId, name, description, priority, storyId, estimatedTime, state, new Date());
+      taskApi.addTask(newTask);
+      showTasksForStory(storyId);
+  } 
+
+  
+
+  function showTaskDetails(taskId: number) {
+
+    const task = taskApi.getTaskById(taskId);
+    if (!task) return;
+    const projectId = localStorage.getItem('currentProjectId');
+    const story = storyApi.getStoryById(task.storyId)
+    if (projectId === null) {
+      console.error('Project ID is null');
+      return;
+    }
+    const project = projectAPI.getProjectByID(parseInt(projectId));
+    const assignableUsers = mockUsers.filter(user => user.role === UserRole.DevOps || user.role === UserRole.Developer);
+  
+    const app = document.getElementById('app');
+    if (!app || !project) return;
+    let doneBtn ='';
+    if (task.state !== TaskState.Done && task.state !== TaskState.ToDo) {
+      doneBtn += `<button id="markTask">Oznacz jako wykonane</button>`;
+    }
+    let assignSection = '';
+    if (!task.assignedUserId) {
+      assignSection = `
+        <select id="userSelect">
+          ${assignableUsers.map(user => `<option value="${user.id}">${user.name}</option>`).join('')}
+        </select>
+        <button id="assignPerson">Przypisz osobę</button>
+      `;
+    } else {
+      const assignedUser = mockUsers.find(user => user.id === task.assignedUserId);
+      assignSection = `<div>Przypisana osoba: ${assignedUser ? assignedUser.name + ' ' + assignedUser.surname : 'Brak'}</div>`;
+    }
+  
+    app.innerHTML = `
+      <h2>Szczegóły zadania: ${task.name}</h2>
+      <div>Opis: ${task.description}</div>
+      <div>Projekt: ${project.name}</div>
+      <div>Status: ${task.state}</div>
+      <div>Data startu: ${task.startDate || 'brak'}</div>
+      <div>Data zakończenia: ${task.endDate || 'brak'}</div>
+      
+      ${assignSection}
+      ${doneBtn}
+      <button id="cancelDetails">Powrót do zadań</button>
+
+    `;
+    
+    document.getElementById('cancelDetails')?.addEventListener('click', () => { 
+      showTasksForStory(task.storyId);
+  });
+  document.getElementById('assignPerson')?.addEventListener('click', () => { 
+    assignUserToTask(taskId);
+});
+document.getElementById('markTask')?.addEventListener('click', () => { 
+  markTaskAsDone(taskId);
+});
+  }
+  function assignUserToTask(taskId: number) {
+    const userSelect = document.getElementById('userSelect') as HTMLSelectElement;
+    const userId = parseInt(userSelect.value);
+    const task = taskApi.getTaskById(taskId);
+  
+    if (task && !task.assignedUserId) {
+      task.assignedUserId = userId;
+      task.state = TaskState.Doing; 
+      task.startDate = new Date(); 
+  
+      taskApi.updateTask(task);
+      showTaskDetails(taskId); 
+    }
+  }
+  function markTaskAsDone(taskId: number) {
+    const task = taskApi.getTaskById(taskId);
+    if (!task) return;
+  
+    task.state = TaskState.Done;
+    task.endDate = new Date();
+  
+    taskApi.updateTask(task);
+  
+    showTasksForStory(task.storyId); 
+  }
