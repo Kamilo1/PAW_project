@@ -1,7 +1,7 @@
 import './style.css'
-import typescriptLogo from './typescript.svg'
+/*import typescriptLogo from './typescript.svg'
 import viteLogo from '/vite.svg'
-import { setupCounter } from './counter.ts'
+import { setupCounter } from './counter.ts'*/
 
 class Project {
   constructor(public id: number, public name: string, public description: string) {}
@@ -49,13 +49,14 @@ enum UserRole {
 }
 
 class User {
-  constructor(public id: number, public name: string, public surname: string, public role: UserRole) {}
+  constructor(public id: number, public name: string, public surname: string, public role: UserRole, public username: String, public password: String) {}
 }
 const mockUsers: User[] = [
-  new User(1, 'Krzysztof', 'Kowalski', UserRole.Admin),
-  new User(2, 'Anna', 'Nowak', UserRole.Developer),
-  new User(3, 'Jan', 'Zieliński', UserRole.DevOps),
+  new User(1, 'Krzysztof', 'Kowalski', UserRole.Admin,'krzysztof','password1'),
+  new User(2, 'Anna', 'Nowak', UserRole.Developer,'anna','password2'),
+  new User(3, 'Jan', 'Zieliński', UserRole.DevOps,'jan','password3'),
 ];
+export { mockUsers };
 class ActiveProject {
   private static storageKey = 'activeProjectId';
   static setActiveProject(projectId: number): void {
