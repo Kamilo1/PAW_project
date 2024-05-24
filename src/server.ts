@@ -1,11 +1,28 @@
 import express from 'express';
 import jwt from 'jsonwebtoken';
 import bodyParser from 'body-parser';
-import { mockUsers } from './main';
+import cors from 'cors';
+
+enum UserRole {
+  Admin = 'admin',
+  DevOps = 'devops',
+  Developer = 'developer',
+}
+
+class User {
+  constructor(public id: number, public name: string, public surname: string, public role: UserRole, public username: String, public password: String) {}
+}
+const mockUsers: User[] = [
+  new User(1, 'Krzysztof', 'Kowalski', UserRole.Admin,'krzysztof','password1'),
+  new User(2, 'Anna', 'Nowak', UserRole.Developer,'anna','password2'),
+  new User(3, 'Jan', 'Zieliński', UserRole.DevOps,'jan','password3'),
+];
+
 
 const app = express();
-app.use(bodyParser.json());
 
+app.use(bodyParser.json());
+app.use(cors());
 const JWT_SECRET = 'your_jwt_secret';
 const JWT_EXPIRATION = '15m';
 const REFRESH_TOKEN_SECRET = 'your_refresh_token_secret';
@@ -46,3 +63,4 @@ app.post('/api/refresh-token', (req, res) => {
 app.listen(3000, () => {
   console.log('Server is running on http://localhost:3000');
 });
+

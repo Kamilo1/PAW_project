@@ -2,6 +2,20 @@ import './style.css'
 /*import typescriptLogo from './typescript.svg'
 import viteLogo from '/vite.svg'
 import { setupCounter } from './counter.ts'*/
+enum UserRole {
+  Admin = 'admin',
+  DevOps = 'devops',
+  Developer = 'developer',
+}
+
+class User {
+  constructor(public id: number, public name: string, public surname: string, public role: UserRole, public username: String, public password: String) {}
+}
+const mockUsers: User[] = [
+  new User(1, 'Krzysztof', 'Kowalski', UserRole.Admin,'krzysztof','password1'),
+  new User(2, 'Anna', 'Nowak', UserRole.Developer,'anna','password2'),
+  new User(3, 'Jan', 'Zieliński', UserRole.DevOps,'jan','password3'),
+];
 
 class Project {
   constructor(public id: number, public name: string, public description: string) {}
@@ -42,21 +56,7 @@ class ProjectApi {
   }
 }
 
-enum UserRole {
-  Admin = 'admin',
-  DevOps = 'devops',
-  Developer = 'developer',
-}
 
-class User {
-  constructor(public id: number, public name: string, public surname: string, public role: UserRole, public username: String, public password: String) {}
-}
-const mockUsers: User[] = [
-  new User(1, 'Krzysztof', 'Kowalski', UserRole.Admin,'krzysztof','password1'),
-  new User(2, 'Anna', 'Nowak', UserRole.Developer,'anna','password2'),
-  new User(3, 'Jan', 'Zieliński', UserRole.DevOps,'jan','password3'),
-];
-export { mockUsers };
 class ActiveProject {
   private static storageKey = 'activeProjectId';
   static setActiveProject(projectId: number): void {
@@ -220,12 +220,22 @@ function renderProjectsTable() {
   const app = document.getElementById('app');
   if (!app) return;
 
-
   app.innerHTML = '';
+  const header = document.createElement('div')
+  header.className= 'header';
+  const token = localStorage.getItem('token');
+  if (!token) {
+    header.innerHTML = '<button class="login-btn">Zaloguj się</button>';
+  } else {
+    const username = localStorage.getItem('username');
+    header.innerHTML = `<p>Witaj, ${username}!</p>`;
+  }
+  app.appendChild(header);
 
-  app.innerHTML = `
-  <button class="add-btn">Dodaj nowy</button>
-  `;
+  const addButton = document.createElement('button');
+  addButton.className = 'add-btn';
+  addButton.textContent = 'Dodaj nowy';
+  app.appendChild(addButton);
   const table = document.createElement('table');
   table.innerHTML = `
       <tr>
@@ -274,6 +284,10 @@ function renderProjectsTable() {
   if (addBtn) {
     addBtn.addEventListener('click',showAddProjectForm);
   }
+  const loginBtn = app.querySelector('.login-btn');
+  if(loginBtn) {
+    loginBtn.addEventListener('click', showLoginForm);
+  }
   document.querySelectorAll('.show-stories-btn').forEach(button => {
     button.addEventListener('click', (event) => {
       const projectId = parseInt((event.target as HTMLElement).getAttribute('data-id')!);
@@ -287,6 +301,7 @@ function renderProjectsTable() {
 document.addEventListener('DOMContentLoaded', () => {
   renderProjectsTable();
 });
+
 function showEditForm(project: Project) {
   const app = document.getElementById('app');
   if (!app) return;
@@ -412,7 +427,7 @@ function showProjectStories(projectId: number) {
     stories.forEach(story => {
       const tr = document.createElement('tr');
       tr.innerHTML = `
-        <td>${localId++}</td> <!-- Inkrementujemy lokalne ID -->
+        <td>${localId++}</td>
         <td>${story.id}</td>
         <td>${story.name}</td>
         <td>${story.description}</td>
@@ -883,4 +898,54 @@ document.getElementById('markTask')?.addEventListener('click', () => {
     taskApi.updateTask(task);
   
     showTasksForStory(task.storyId); 
+  }
+  function showLoginForm() {
+    const app = document.getElementById('app');
+    if (!app) return;
+  
+    app.innerHTML = `
+      <div id="login-form-container">
+        <form id="loginForm">
+          <div>
+            <label for="username">Nazwa użytkownika:</label>
+            <input type="text" id="username" required>
+          </div>
+          <div>
+            <label for="password">Hasło:</label>
+            <input type="password" id="password" required>
+          </div>
+          <button type="submit">Zaloguj</button>
+        </form>
+      </div>
+    `;
+    document.getElementById('loginForm')?.addEventListener('submit', async (event) => {
+      event.preventDefault();
+  
+      const username = (document.getElementById('username') as HTMLInputElement).value;
+      const password = (document.getElementById('password') as HTMLInputElement).value;
+  
+      try {
+        const response = await fetch('http://localhost:3000/api/login', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ username, password })
+        });
+  
+        if (response.ok) {
+          const { token, refreshToken } = await response.json();
+          localStorage.setItem('token', token);
+          localStorage.setItem('refreshToken', refreshToken);
+          localStorage.setItem('username', username);
+          alert('Zalogowano pomyślnie');
+          renderProjectsTable();
+        } else {
+          alert('Błędne dane logowania');
+        }
+      } catch (error) {
+        console.error('Error logging in:', error);
+        alert('Wystąpił błąd podczas logowania');
+      }
+    });
   }
