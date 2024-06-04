@@ -1,4 +1,9 @@
 import './style.css'
+import 'bootstrap/dist/css/bootstrap.min.css';
+import 'bootstrap';
+import { notificationService } from './NotificationService';
+import { Modal } from 'bootstrap';
+
 /*import typescriptLogo from './typescript.svg'
 import viteLogo from '/vite.svg'
 import { setupCounter } from './counter.ts'*/
@@ -219,76 +224,113 @@ function renderProjectsTable() {
   const projects = projectAPI.getAllProjects();
   const app = document.getElementById('app');
   if (!app) return;
-
   app.innerHTML = '';
-  const header = document.createElement('div')
-  header.className= 'header';
-  const token = localStorage.getItem('token');
-  if (!token) {
-    header.innerHTML = '<button class="login-btn">Zaloguj się</button>';
-  } else {
-    const username = localStorage.getItem('username');
-    header.innerHTML = `<p>Witaj, ${username}!</p>`;
-  }
-  app.appendChild(header);
+  const header = document.createElement('div');
+  header.className = 'header';
+  const toggleThemeButton = document.createElement('button');
+  toggleThemeButton.className = 'btn btn-dark';
+  toggleThemeButton.textContent = 'Toggle Theme';
+  toggleThemeButton.onclick = toggleTheme;
+  header.appendChild(toggleThemeButton);
 
+  const googleButton = document.createElement('div');
+  googleButton.id = 'google-sign-in-button';
+  const span = document.createElement('span');
+  span.id = 'unread-counter';
+  span.className = 'ml-auto';
+  span.addEventListener('click', showNotificationModal);
+  const loginButton = document.createElement('button');
+  loginButton.className = 'header-button';
+  loginButton.innerText = 'Zaloguj się';
+  loginButton.onclick = showLoginForm;
+  const token = localStorage.getItem('token');
+  if(!token)
+  {
+    header.appendChild(loginButton);
+  header.appendChild(googleButton);
+  } else {
+    header.innerHTML='';
+    const username = localStorage.getItem('username');
+    header.innerHTML = `<p>Witaj, ${username}!</p><button class="btn-sign-out">Wyloguj się</button>`;
+  }
+  header.appendChild(span);
+  app.appendChild(header);
+  renderUnreadCounter();
+  initializeGoogleSignIn();
+  const signOutBtn = app.querySelector('.btn-sign-out');
+  if (signOutBtn) {
+    signOutBtn.addEventListener('click', () => {
+      localStorage.removeItem('token');
+  localStorage.removeItem('refreshToken');
+  localStorage.removeItem('username');
+  alert('Wylogowano pomyślnie');
+  renderProjectsTable();
+  initializeGoogleSignIn();
+  });
+  }
   const addButton = document.createElement('button');
-  addButton.className = 'add-btn';
+  addButton.className = 'btn btn-success my-3';
   addButton.textContent = 'Dodaj nowy';
   app.appendChild(addButton);
+
   const table = document.createElement('table');
+  table.className = 'table table-striped';
   table.innerHTML = `
-      <tr>
-          <th>ID</th>
-          <th>Nazwa</th>
-          <th>Opis</th>
-          <th>Akcje</th>
-      </tr>
+      <thead>
+        <tr>
+            <th>ID</th>
+            <th>Nazwa</th>
+            <th>Opis</th>
+            <th>Akcje</th>
+        </tr>
+      </thead>
+      <tbody>
+      </tbody>
   `;
 
- 
-  projects.forEach(project => {
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
+  projects.forEach((project) => {
+    const tr = document.createElement('tr');
+    tr.className = 'rows'
+    tr.innerHTML = `
           <td>${project.id}</td>
           <td>${project.name}</td>
           <td>${project.description}</td>
           <td>
-              <button class="edit-btn" data-id="${project.id}">Edytuj</button>
-              <button class="delete-btn" data-id="${project.id}">Usuń</button>
-              <button class="show-stories-btn" data-id="${project.id}">Pokaż historie</button>
+              <button class="btn btn-warning btn-sm edit-btn" data-id="${project.id}">Edytuj</button>
+              <button class="btn btn-danger btn-sm delete-btn" data-id="${project.id}">Usuń</button>
+              <button class="btn btn-info btn-sm show-stories-btn" data-id="${project.id}">Pokaż historie</button>
           </td>
-      `;
-      const editBtn = tr.querySelector('.edit-btn');
-      const deleteBtn = tr.querySelector('.delete-btn');
-      if (editBtn) {
-        editBtn.addEventListener('click', () => {
-          const projectToEdit = projectAPI.getProjectByID(project.id);
-          if (projectToEdit) {
-              showEditForm(projectToEdit);
-          }
+    `;
+    const editBtn = tr.querySelector('.edit-btn');
+    const deleteBtn = tr.querySelector('.delete-btn');
+    if (editBtn) {
+      editBtn.addEventListener('click', () => {
+        const projectToEdit = projectAPI.getProjectByID(project.id);
+        if (projectToEdit) {
+          showEditForm(projectToEdit);
+        }
       });
-      }
-      if (deleteBtn) {
-          deleteBtn.addEventListener('click', () => {
-              projectAPI.deleteProject(project.id);
-              renderProjectsTable(); 
-          });
-      }
+    }
+    if (deleteBtn) {
+      deleteBtn.addEventListener('click', () => {
+        projectAPI.deleteProject(project.id);
+        renderProjectsTable();
+      });
+    }
 
-      table.appendChild(tr);
+    table.querySelector('tbody')?.appendChild(tr);
   });
 
   app.appendChild(table);
   const addBtn = app.querySelector('.add-btn');
   if (addBtn) {
-    addBtn.addEventListener('click',showAddProjectForm);
+    addBtn.addEventListener('click', showAddProjectForm);
   }
   const loginBtn = app.querySelector('.login-btn');
-  if(loginBtn) {
+  if (loginBtn) {
     loginBtn.addEventListener('click', showLoginForm);
   }
-  document.querySelectorAll('.show-stories-btn').forEach(button => {
+  document.querySelectorAll('.show-stories-btn').forEach((button) => {
     button.addEventListener('click', (event) => {
       const projectId = parseInt((event.target as HTMLElement).getAttribute('data-id')!);
       localStorage.setItem('currentProjectId', projectId.toString());
@@ -298,8 +340,13 @@ function renderProjectsTable() {
 }
 
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+  await loadGoogleScript();
+  
+  
   renderProjectsTable();
+  initializeGoogleSignIn();
+  renderUnreadCounter();
 });
 
 function showEditForm(project: Project) {
@@ -949,3 +996,154 @@ document.getElementById('markTask')?.addEventListener('click', () => {
       }
     });
   }
+  function initializeGoogleSignIn() {
+    const clientId = '354880993064-ha62ceb9l4l6kqppg6ff0mr51l6inbq6.apps.googleusercontent.com';
+    google.accounts.id.initialize({
+      client_id: clientId,
+      callback: handleCredentialResponse,
+    });
+    google.accounts.id.renderButton(
+      document.getElementById('google-sign-in-button')!,
+      { theme: 'outline', size: 'large' }  
+    );
+    console.log('Google Sign-In initialized');
+  }
+  
+  function handleCredentialResponse(response: any) {
+    console.log('Google credential response received', response);
+    const idToken = response.credential;
+    fetch('https://www.googleapis.com/oauth2/v3/tokeninfo?id_token=' + idToken)
+      .then((res) => res.json())
+      .then((user) => {
+        console.log('User info from Google:', user);
+       
+        const newUser = new User(
+          mockUsers.length + 1,
+          user.given_name,
+          user.family_name,
+          UserRole.Developer, 
+          user.email,
+          '' 
+        );
+        mockUsers.push(newUser);
+        console.log('Updated mockUsers:', mockUsers);
+        
+        localStorage.setItem('token', idToken);
+        localStorage.setItem('username', user.name);
+        alert('Zalogowano pomyślnie');
+      
+        renderProjectsTable();
+      })
+      .catch((error) => {
+        console.error('Error during Google token validation:', error);
+        alert('Błąd logowania przez Google');
+      });
+   }
+  
+   function loadGoogleScript(): Promise<void> {
+    return new Promise((resolve) => {
+      const script = document.createElement('script');
+      script.src = 'https://accounts.google.com/gsi/client';
+      script.async = true;
+      script.defer = true;
+      script.onload = () => resolve();
+      document.head.appendChild(script);
+    });
+   }
+   function toggleTheme() {
+    document.body.classList.toggle('dark-mode');
+    if (document.body.classList.contains('dark-mode')) {
+      localStorage.setItem('theme', 'dark');
+    } else {
+      localStorage.setItem('theme', 'light');
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    const theme = localStorage.getItem('theme');
+    if (theme === 'dark') {
+      document.body.classList.add('dark-mode');
+    }
+  });
+
+  function renderUnreadCounter() {
+    const counterElement = document.getElementById('unread-counter');
+    if (!counterElement) return;
+  
+    notificationService.unreadCount().subscribe(count => {
+      counterElement.textContent = `Nieprzeczytane powiadomienia: ${count}`;
+    });
+  }
+  
+  function showNotificationModal() {
+    const modalBody = document.getElementById('notificationModalBody');
+    if (!modalBody) return;
+  
+    notificationService.list().subscribe(notifications => {
+      const listHtml = notifications.map(notification => `
+        <div class="notification ${notification.read ? '' : 'unread'}" data-id="${notification.id}">
+          <h3>${notification.title}</h3>
+          <p>${notification.message}</p>
+          <small>${new Date(notification.date).toLocaleString()}</small>
+        </div>
+      `).join('');
+      modalBody.innerHTML = listHtml;
+  
+      document.querySelectorAll('.notification').forEach(notificationElement => {
+        notificationElement.addEventListener('click', (event) => {
+          const notificationId = parseInt((event.currentTarget as HTMLElement).getAttribute('data-id')!);
+          notificationService.markAsRead(notificationId);
+        });
+      });
+  
+   
+      const modalElement = document.getElementById('notificationModal')!;
+    const modal = new Modal(modalElement, { backdrop: false });
+    modal.show();
+
+    
+    modalElement.addEventListener('hidden.bs.modal', () => {
+      document.querySelectorAll('.modal-backdrop').forEach(backdrop => backdrop.remove());
+    })
+    });
+  }
+  
+  document.addEventListener('DOMContentLoaded', async () => {
+    createNotificationModal();
+    await loadGoogleScript();
+    renderProjectsTable();
+    initializeGoogleSignIn();
+    renderUnreadCounter();
+  });
+  
+
+  notificationService.send({
+    title: 'Nowe zadanie',
+    message: 'Masz nowe zadanie do wykonania.',
+    date: new Date().toISOString(),
+    priority: 'medium',
+    read: false
+  });
+
+  function createNotificationModal() {
+    const modalHtml = `
+      <div class="modal fade" id="notificationModal" tabindex="-1" aria-labelledby="notificationModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title" id="notificationModalLabel">Powiadomienia</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="notificationModalBody">
+              <!-- Lista powiadomień -->
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Zamknij</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+  }
+  
