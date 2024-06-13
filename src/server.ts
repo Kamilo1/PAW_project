@@ -40,7 +40,8 @@ app.post('/api/login', (req, res) => {
   const token = jwt.sign({ id: user.id, username: user.username, role: user.role }, JWT_SECRET, { expiresIn: JWT_EXPIRATION });
   const refreshToken = jwt.sign({ id: user.id, username: user.username }, REFRESH_TOKEN_SECRET, { expiresIn: REFRESH_TOKEN_EXPIRATION });
 
-  res.json({ token, refreshToken });
+
+  res.json({ token, refreshToken, user: { id: user.id, username: user.username, role: user.role } });
 });
 
 app.post('/api/refresh-token', (req, res) => {
@@ -78,18 +79,20 @@ app.post('/api/google-login', async (req, res) => {
     let user = mockUsers.find((u) => u.username === email);
 
     if (!user) {
-      user = new User(mockUsers.length + 1, name || '', '', UserRole.Developer, '', '');
+      user = new User(mockUsers.length + 1, name || '', '', UserRole.Developer, email || '', '');
       mockUsers.push(user);
     }
 
     const token = jwt.sign({ id: user.id, username: user.username, role: user.role }, JWT_SECRET, { expiresIn: JWT_EXPIRATION });
     const refreshToken = jwt.sign({ id: user.id, username: user.username }, REFRESH_TOKEN_SECRET, { expiresIn: REFRESH_TOKEN_EXPIRATION });
 
-    res.json({ token, refreshToken, username: user.username });
+    
+    res.json({ token, refreshToken, user: { id: user.id, username: user.username, role: user.role } });
   } catch (error) {
     res.status(401).json({ message: 'Invalid Google token' });
   }
 });
+
 app.listen(3000, () => {
   console.log('Server is running on http://localhost:3000');
 });

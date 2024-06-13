@@ -3,10 +3,8 @@ import 'bootstrap/dist/css/bootstrap.min.css';
 import 'bootstrap';
 import { notificationService } from './NotificationService';
 import { Modal } from 'bootstrap';
+import { IAMAuth } from 'google-auth-library';
 
-/*import typescriptLogo from './typescript.svg'
-import viteLogo from '/vite.svg'
-import { setupCounter } from './counter.ts'*/
 enum UserRole {
   Admin = 'admin',
   DevOps = 'devops',
@@ -62,16 +60,6 @@ class ProjectApi {
 }
 
 
-class ActiveProject {
-  private static storageKey = 'activeProjectId';
-  static setActiveProject(projectId: number): void {
-            localStorage.setItem(this.storageKey,projectId.toString())
-  }
-  static getActiveProjectId(): number | null {
-    const projectId = localStorage.getItem(this.storageKey)
-    return projectId ? parseInt(projectId) : null
-  }
-}
 
 enum StoryState {
   ToDo = 'todo',
@@ -255,21 +243,23 @@ function renderProjectsTable() {
   }
   header.appendChild(span);
   app.appendChild(header);
-  renderUnreadCounter();
-  initializeGoogleSignIn();
+  
   const signOutBtn = app.querySelector('.btn-sign-out');
   if (signOutBtn) {
     signOutBtn.addEventListener('click', () => {
       localStorage.removeItem('token');
   localStorage.removeItem('refreshToken');
   localStorage.removeItem('username');
+  localStorage.removeItem('user');
   alert('Wylogowano pomyślnie');
   renderProjectsTable();
   initializeGoogleSignIn();
   });
   }
+  initializeGoogleSignIn();
+  renderUnreadCounter();
   const addButton = document.createElement('button');
-  addButton.className = 'btn btn-success my-3';
+  addButton.className = 'btn btn-success my-3 add-btn';
   addButton.textContent = 'Dodaj nowy';
   app.appendChild(addButton);
 
@@ -303,7 +293,7 @@ function renderProjectsTable() {
     `;
     const editBtn = tr.querySelector('.edit-btn');
     const deleteBtn = tr.querySelector('.delete-btn');
-    if (editBtn) {
+    if (editBtn && isAdmin()) {
       editBtn.addEventListener('click', () => {
         const projectToEdit = projectAPI.getProjectByID(project.id);
         if (projectToEdit) {
@@ -311,7 +301,7 @@ function renderProjectsTable() {
         }
       });
     }
-    if (deleteBtn) {
+    if (deleteBtn && isAdmin()) {
       deleteBtn.addEventListener('click', () => {
         projectAPI.deleteProject(project.id);
         renderProjectsTable();
@@ -322,8 +312,10 @@ function renderProjectsTable() {
   });
 
   app.appendChild(table);
+
+
   const addBtn = app.querySelector('.add-btn');
-  if (addBtn) {
+  if (addBtn && isAdmin()) {
     addBtn.addEventListener('click', showAddProjectForm);
   }
   const loginBtn = app.querySelector('.login-btn');
@@ -340,10 +332,10 @@ function renderProjectsTable() {
 }
 
 
+
 document.addEventListener('DOMContentLoaded', async () => {
   await loadGoogleScript();
-  
-  
+  createNotificationModal();
   renderProjectsTable();
   initializeGoogleSignIn();
   renderUnreadCounter();
@@ -458,7 +450,7 @@ function showProjectStories(projectId: number) {
     const table = document.createElement('table');
     table.innerHTML = `
       <tr>
-        <th>Lp.</th> <!-- Dodajemy kolumnę Lp. dla lokalnego numerowania -->
+        <th>Lp.</th>
         <th>ID</th>
         <th>Nazwa</th>
         <th>Opis</th>
@@ -505,6 +497,7 @@ function showProjectStories(projectId: number) {
     });
   });
   document.querySelectorAll('.edit-story-btn').forEach(button => {
+    if(isAdmin()){
     button.addEventListener('click', function(event) {
         const target = event.currentTarget as HTMLButtonElement;
         const storyId = parseInt(target.getAttribute('data-id')!);
@@ -513,17 +506,20 @@ function showProjectStories(projectId: number) {
             showStoriesEditForm(storyToEdit);
         }
     });
+  }
 });
   const addStoryBtn = app.querySelector('.add-story-btn');
-  if(addStoryBtn){
+  if(addStoryBtn && isAdmin()){
     addStoryBtn.addEventListener('click', () => showAddStoryForm(projectId));
   }
   document.querySelectorAll('.delete-story-btn').forEach(button => {
+    if(isAdmin()){
     button.addEventListener('click', (event) => {
       const storyId = parseInt((event.target as HTMLElement).getAttribute('data-id')!);
       storyApi.deleteStory(storyId);
       setTimeout(() => showProjectStories(projectId), 100);
     });
+  }
   });
   const backButton = document.createElement('button');
   backButton.textContent = 'Powrót do projektów';
@@ -711,10 +707,14 @@ function showTasksForStory(storyId: number) {
       showTaskDetails(taskId);
     });
   });
+  if(isAdmin()){
   document.querySelector('.addTaskBtn')?.addEventListener('click', () => {
     showAddTaskForm(storyId);
 });
+}
+}
   document.querySelectorAll('.edit-task-btn').forEach(button => {
+    if(isAdmin()){
     button.addEventListener('click', (event) => {
       const taskId = parseInt((event.target as HTMLElement).getAttribute('data-id')!);
       const taskToEdit = taskApi.getTaskById(taskId);
@@ -722,14 +722,18 @@ function showTasksForStory(storyId: number) {
         showEditTaskForm(taskToEdit);
       }
     });
-  });
+  }
+}
+);
   document.querySelectorAll('.delete-task-btn').forEach(button => {
+    if(isAdmin()){
     button.addEventListener('click', (event) => {
         const taskId = parseInt((event.target as HTMLElement).getAttribute('data-id')!);
         deleteTask(taskId);
     });
+  }
 });  
-}
+
 
 function showEditTaskForm(task: Task) {
   const app = document.getElementById('app');
@@ -914,12 +918,16 @@ function handleAddTaskSubmit(event: Event) {
     document.getElementById('cancelDetails')?.addEventListener('click', () => { 
       showTasksForStory(task.storyId);
   });
+  if(isAdmin()){
   document.getElementById('assignPerson')?.addEventListener('click', () => { 
     assignUserToTask(taskId);
 });
+  }
+if(isAdmin()){
 document.getElementById('markTask')?.addEventListener('click', () => { 
   markTaskAsDone(taskId);
 });
+  }
   }
   function assignUserToTask(taskId: number) {
     const userSelect = document.getElementById('userSelect') as HTMLSelectElement;
@@ -949,7 +957,7 @@ document.getElementById('markTask')?.addEventListener('click', () => {
   function showLoginForm() {
     const app = document.getElementById('app');
     if (!app) return;
-  
+
     app.innerHTML = `
       <div id="login-form-container">
         <form id="loginForm">
@@ -965,37 +973,47 @@ document.getElementById('markTask')?.addEventListener('click', () => {
         </form>
       </div>
     `;
+
     document.getElementById('loginForm')?.addEventListener('submit', async (event) => {
-      event.preventDefault();
-  
-      const username = (document.getElementById('username') as HTMLInputElement).value;
-      const password = (document.getElementById('password') as HTMLInputElement).value;
-  
-      try {
-        const response = await fetch('http://localhost:3000/api/login', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ username, password })
-        });
-  
-        if (response.ok) {
-          const { token, refreshToken } = await response.json();
-          localStorage.setItem('token', token);
-          localStorage.setItem('refreshToken', refreshToken);
-          localStorage.setItem('username', username);
-          alert('Zalogowano pomyślnie');
-          renderProjectsTable();
-        } else {
-          alert('Błędne dane logowania');
+        event.preventDefault();
+
+        const username = (document.getElementById('username') as HTMLInputElement).value;
+        const password = (document.getElementById('password') as HTMLInputElement).value;
+
+        try {
+            const response = await fetch('http://localhost:3000/api/login', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ username, password })
+            });
+
+            if (response.ok) {
+                const { token, refreshToken, user } = await response.json();
+                localStorage.setItem('token', token);
+                localStorage.setItem('refreshToken', refreshToken);
+                localStorage.setItem('username', username);
+                localStorage.setItem('user', JSON.stringify(user));
+                alert('Zalogowano pomyślnie');
+                renderProjectsTable();
+                notificationService.send({
+                  title: 'Zalogowano pomyślnie',
+                  message: `Użytkownik ${username} został zalogowany.`,
+                  date: new Date().toISOString(),
+                  priority: 'low',
+                  read: false
+              });
+            } else {
+                alert('Błędne dane logowania');
+            }
+        } catch (error) {
+            console.error('Error logging in:', error);
+            alert('Wystąpił błąd podczas logowania');
         }
-      } catch (error) {
-        console.error('Error logging in:', error);
-        alert('Wystąpił błąd podczas logowania');
-      }
     });
-  }
+}
+
   function initializeGoogleSignIn() {
     const clientId = '354880993064-ha62ceb9l4l6kqppg6ff0mr51l6inbq6.apps.googleusercontent.com';
     google.accounts.id.initialize({
@@ -1016,29 +1034,37 @@ document.getElementById('markTask')?.addEventListener('click', () => {
       .then((res) => res.json())
       .then((user) => {
         console.log('User info from Google:', user);
-       
+
         const newUser = new User(
           mockUsers.length + 1,
           user.given_name,
           user.family_name,
-          UserRole.Developer, 
+          UserRole.Developer,
           user.email,
-          '' 
+          ''
         );
         mockUsers.push(newUser);
         console.log('Updated mockUsers:', mockUsers);
-        
+
         localStorage.setItem('token', idToken);
         localStorage.setItem('username', user.name);
+        localStorage.setItem('user', JSON.stringify(newUser));
         alert('Zalogowano pomyślnie');
-      
+        notificationService.send({
+          title: 'Zalogowano pomyślnie przez Google',
+          message: `Użytkownik ${user.given_name} ${user.family_name} został zalogowany.`,
+          date: new Date().toISOString(),
+          priority: 'low',
+          read: false
+      });
         renderProjectsTable();
       })
       .catch((error) => {
         console.error('Error during Google token validation:', error);
         alert('Błąd logowania przez Google');
       });
-   }
+}
+
   
    function loadGoogleScript(): Promise<void> {
     return new Promise((resolve) => {
@@ -1108,13 +1134,6 @@ document.getElementById('markTask')?.addEventListener('click', () => {
     });
   }
   
-  document.addEventListener('DOMContentLoaded', async () => {
-    createNotificationModal();
-    await loadGoogleScript();
-    renderProjectsTable();
-    initializeGoogleSignIn();
-    renderUnreadCounter();
-  });
   
 
   notificationService.send({
@@ -1135,7 +1154,6 @@ document.getElementById('markTask')?.addEventListener('click', () => {
               <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body" id="notificationModalBody">
-              <!-- Lista powiadomień -->
             </div>
             <div class="modal-footer">
               <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Zamknij</button>
@@ -1147,3 +1165,11 @@ document.getElementById('markTask')?.addEventListener('click', () => {
     document.body.insertAdjacentHTML('beforeend', modalHtml);
   }
   
+  function isAdmin() {
+    const user = localStorage.getItem('user');
+    if (user) {
+      const userObj = JSON.parse(user);
+      return userObj.role === 'admin';
+    }
+    return false;
+  }
